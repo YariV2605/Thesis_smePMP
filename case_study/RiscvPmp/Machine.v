@@ -176,6 +176,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
   | pmpWriteCfg           : Fun [cfg :: ty_pmpcfg_ent; value :: ty_byte] ty_pmpcfg_ent
   | pmpWriteAddr          : Fun [locked :: ty.bool; addr :: ty_xlenbits; value :: ty_xlenbits] ty_xlenbits
   | pmpCheck (bytes : nat) {H : restrict_bytes bytes} : Fun [addr ∷ ty_xlenbits; acc ∷ ty_access_type; priv ∷ ty_privilege] (ty.option ty_exception_type)
+  | smePmpCheckPerms      : Fun [ent ∷ ty_pmpcfg_ent; acc ∷ ty_access_type; priv ∷ ty_privilege] ty.bool
   | pmpCheckPerms         : Fun [ent ∷ ty_pmpcfg_ent; acc ∷ ty_access_type; priv ∷ ty_privilege] ty.bool
   | pmpCheckRWX           : Fun [ent ∷ ty_pmpcfg_ent; acc ∷ ty_access_type] ty.bool
   | pmpMatchEntry         : Fun [addr ∷ ty_xlenbits; width :: ty_xlenbits; acc ∷ ty_access_type; priv ∷ ty_privilege; ent ∷ ty_pmpcfg_ent; pmpaddr ∷ ty_xlenbits; prev_pmpaddr ∷ ty_xlenbits] ty_pmpmatch
@@ -680,6 +681,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
     | inr v => stm_call (@checked_mem_write bytes H) [paddr; data]
     end.
 
+  (*FIXME*)
   Definition fun_pmpLocked : Stm [cfg ∷ ty_pmpcfg_ent] ty.bool :=
     match: cfg in rpmpcfg_ent with [L; A; X; W; R] => L end.
 
@@ -697,6 +699,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
       stm_val ty.unit tt
     else fail "writing to non-existent cfg".
 
+  (*FIXME*)
   Definition fun_pmpWriteCfg : Stm [cfg :: ty_pmpcfg_ent; value :: ty_byte] ty_pmpcfg_ent :=
     let: locked := call pmpLocked cfg in
     if: locked then cfg else stm_pmpcfg_ent_from_bits value.
@@ -724,6 +727,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
       | PMP_Success  => stm_val ty.bool true
       | PMP_Fail     => stm_val ty.bool false
       | PMP_Continue =>
+      (*FIXME update from sail line 115 to 146-151*)
           match: priv in privilege with
           | Machine => stm_val ty.bool true
           | User    => stm_val ty.bool false
@@ -741,16 +745,38 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
         |> KExecute pat_unit   => stm_exp (Some E_Fetch_Access_Fault)
         end.
 
+  (*FIXME pmpCheckPerms in sail code (only exists in new version)*)
+  Definition fun_smePmpCheckPerms : Stm [ent ∷ ty_pmpcfg_ent; acc ∷ ty_access_type; priv ∷ ty_privilege] ty.bool :=
+  match: priv in privilege with
+  | _ => stm_val ty.bool false
+  end.
+  (* if: sme_enabled
+  then
+    if mseccfg[MML]
+    then
+      match acc with
+      | 
+      end
+    else
+  else
+    stm_val ty.bool false *)
+
   Definition fun_pmpCheckPerms : Stm [ent ∷ ty_pmpcfg_ent; acc ∷ ty_access_type; priv ∷ ty_privilege] ty.bool :=
-    match: priv in privilege with
-    | Machine =>
-      let: tmp := call pmpLocked ent in
-      if: tmp
-      then call pmpCheckRWX ent acc
-      else stm_val ty.bool true
-    | User =>
-      call pmpCheckRWX ent acc
-    end.
+    let: tmp1 := call smePmpCheckPerms ent acc priv in
+    if: tmp1
+    then
+      stm_val ty.bool true
+    else
+      match: priv in privilege with
+      | Machine =>
+        let: tmp := call pmpLocked ent in
+        if: tmp
+        (*then call pmpCheckRWX ent acc*)
+        then stm_val ty.bool false
+        else stm_val ty.bool true
+      | User =>
+        call pmpCheckRWX ent acc
+      end.
 
   Definition fun_pmpCheckRWX : Stm [ent ∷ ty_pmpcfg_ent; acc ∷ ty_access_type] ty.bool :=
     match: ent in rpmpcfg_ent with
@@ -1507,6 +1533,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
     | pmpWriteCfg             => fun_pmpWriteCfg
     | pmpWriteAddr            => fun_pmpWriteAddr
     | @pmpCheck bytes H       => @fun_pmpCheck bytes H
+    | smePmpCheckPerms        => fun_smePmpCheckPerms
     | pmpCheckPerms           => fun_pmpCheckPerms
     | pmpCheckRWX             => fun_pmpCheckRWX
     | pmpMatchEntry           => fun_pmpMatchEntry
@@ -1592,6 +1619,8 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
     Instance accessible_pmpCheckRWX : AccessibleFun pmpCheckRWX.
     Proof. accessible_proof. Qed.
     Instance accessible_pmpLocked : AccessibleFun pmpLocked.
+    Proof. accessible_proof. Qed.
+    Instance accessible_smePmpCheckPerms : AccessibleFun smePmpCheckPerms.
     Proof. accessible_proof. Qed.
     Instance accessible_pmpCheckPerms : AccessibleFun pmpCheckPerms.
     Proof. accessible_proof. Qed.
