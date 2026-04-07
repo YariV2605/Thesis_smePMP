@@ -105,6 +105,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
                ∃ "mie", mie ↦ term_var "mie" ∗
                ∃ "mpie", ∃ "mie",
                            mstatus       ↦ term_record rmstatus [nenv term_var "mpp"; term_var "mpie"; term_var "mie" ] ∗
+               ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [nenv term_var "mml"; term_var "mmwp"; term_var "rlb" ] ∗
                            asn_pmp_entries (term_var "entries") ∗
                            asn_pmp_addr_access (term_var "entries") (term_var "m") ∗
                            asn_gprs;
@@ -112,6 +113,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
              sep_contract_postcondition   :=
                            asn_pmp_addr_access (term_var "entries") (term_var "m") ∗
                            asn_gprs ∗
+               ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [term_var "mml"; term_var "mmwp"; term_var "rlb" ] ∗
                            pc     ↦ term_var "i" ∗
                ∃ "mscratch", mscratch ↦ term_var "mscratch" ∗
                ∃ "mcause", mcause ↦ term_var "mcause" ∗
@@ -213,6 +215,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
              sep_contract_localstore      := [term_var csr];
              sep_contract_precondition    :=
               ∃ "mpie", ∃ "mie", mstatus ↦ term_record rmstatus [nenv term_var "mpp"; term_var "mpie"; term_var "mie" ]
+               ∗ ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [nenv term_var "mml"; term_var "mmwp"; term_var "rlb" ]
                ∗ mtvec ↦ term_var "mtvec"
                ∗ (∃ "mscratch", mscratch ↦ term_var "mscratch")
                ∗ mepc ↦ term_var "mepc"
@@ -227,6 +230,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
              sep_contract_postcondition   :=
                ∃ "result", term_var "result_readCSR" = term_var "result"
                ∗ ∃ "mpie", ∃ "mie", mstatus ↦ term_record rmstatus [term_var "mpp"; term_var "mpie"; term_var "mie" ]
+               ∗ ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [term_var "mml"; term_var "mmwp"; term_var "rlb" ]
                ∗ mtvec ↦ term_var "mtvec"
                ∗ (∃ "mscratch", mscratch ↦ term_var "mscratch")
                ∗ mepc ↦ term_var "mepc"
@@ -244,6 +248,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
              sep_contract_localstore      := [term_var csr; term_var value];
              sep_contract_precondition    :=
               ∃ "mpp", ∃ "mpie", ∃ "mie", mstatus ↦ term_record rmstatus [term_var "mpp"; term_var "mpie"; term_var "mie" ]
+               ∗ ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [term_var "mml"; term_var "mmwp"; term_var "rlb" ]
                ∗ ∃ "mtvec", mtvec ↦ term_var "mtvec"
                ∗ (∃ "mscratch", mscratch ↦ term_var "mscratch")
                ∗ ∃ "mepc", mepc ↦ term_var "mepc"
@@ -258,6 +263,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
              sep_contract_postcondition   :=
                term_var "result_writeCSR" = term_val ty.unit tt
                ∗ ∃ "mpie", ∃ "mie", ∃ "mpp", mstatus ↦ term_record rmstatus [term_var "mpp"; term_var "mpie"; term_var "mie" ]
+               ∗ ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [term_var "mml"; term_var "mmwp"; term_var "rlb" ]
                ∗ ∃ "mtvec", mtvec ↦ term_var "mtvec"
                ∗ (∃ "mscratch", mscratch ↦ term_var "mscratch")
                ∗ ∃ "mepc", mepc ↦ term_var "mepc"
@@ -583,6 +589,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
                ∃ "mie",    mie           ↦ term_var "mie" ∗
                ∃ "mip",    mip           ↦ term_var "mip" ∗
                ∃ "mpie", ∃ "mie", mstatus ↦ term_record rmstatus [ term_var "mpp"; term_var "mpie"; term_var "mie" ] ∗
+               ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [ term_var "mml"; term_var "mmwp"; term_var "rlb" ] ∗
                            asn_pmp_entries (term_var "entries") ∗
                            asn_pmp_addr_access (term_var "entries") (term_var "m") ∗
                            asn_gprs;
@@ -591,6 +598,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
                (  (* Executing normally *)
                               asn_pmp_addr_access (term_var "entries") (term_var "m") ∗
                               asn_gprs ∗
+               ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [ term_var "mml"; term_var "mmwp"; term_var "rlb" ] ∗
                               asn_pmp_entries (term_var "entries") ∗
                   ∃ "mcause", mcause ↦ term_var "mcause" ∗
                   ∃ "mie",    mie           ↦ term_var "mie" ∗

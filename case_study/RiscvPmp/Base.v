@@ -174,6 +174,7 @@ Inductive CSRIdx : Set :=
 | Mip
 | MPMPADDR0
 | MPMPADDR1
+| MSeccfg
 .
 
 Definition NumPmpEntries := 2.
@@ -437,6 +438,15 @@ Record Pmpcfg_ent : Set :=
       R : bool;
     }.
 
+(* TODO *)
+Record Mseccfg : Set :=
+  MkMseccfg
+    {
+      MML   : bool;
+      MMWP  : bool;
+      RLB   : bool
+    }.
+
 Record Mstatus : Set :=
   MkMstatus
     { MPP : Privilege
@@ -446,6 +456,7 @@ Record Mstatus : Set :=
 
 Inductive Records : Set :=
 | rpmpcfg_ent
+| rmseccfg
 | rmstatus
 | rminterrupts
 .
@@ -488,6 +499,7 @@ Section TransparentObligations.
   Derive NoConfusion for MemoryOpResultConstructor.
   Derive NoConfusion for Records.
   Derive NoConfusion for Pmpcfg_ent.
+  Derive NoConfusion for Mseccfg.
   Derive NoConfusion for Mstatus.
   Derive NoConfusion for Minterrupts.
   Derive NoConfusion for InterruptSet.
@@ -529,6 +541,7 @@ Derive EqDec for MemoryOpResult.
 Derive EqDec for MemoryOpResultConstructor.
 Derive EqDec for Records.
 Derive EqDec for Pmpcfg_ent.
+Derive EqDec for Mseccfg.
 Derive EqDec for Mstatus.
 Derive EqDec for Minterrupts.
 Derive EqDec for InterruptSet.
@@ -543,7 +556,7 @@ Section Finite.
     {| enum := [User;Machine] |}.
 
   #[export,program] Instance CSRIdx_finite : Finite CSRIdx :=
-    {| enum := [MStatus;Mie;MTvec;MScratch;MEpc;MCause;MPMP0CFG;MPMPADDR0;MPMPADDR1;Mip] |}.
+    {| enum := [MStatus;Mie;MTvec;MScratch;MEpc;MCause;MPMP0CFG;MPMPADDR0;MPMPADDR1;Mip;MSeccfg] |}.
 
   #[export,program] Instance InterruptType_finite : Finite InterruptType :=
     {| enum := [I_U_Software; I_M_Software; I_U_Timer; I_M_Timer; I_U_External; I_M_External] |}.
@@ -687,6 +700,7 @@ Module Export RiscvPmpBase <: Base.
   Definition ty_ctl_result                     := (ty.union ctl_result).
   Definition ty_interrupt_set                  := (ty.union interrupt_set).
   Definition ty_pmpcfg_ent                     := (ty.record rpmpcfg_ent).
+  Definition ty_mseccfg                        := (ty.record rmseccfg).
   Definition ty_mstatus                        := (ty.record rmstatus).
   Definition ty_Minterrupts                    := (ty.record rminterrupts).
   Definition ty_pmpentry                       := (ty.prod ty_pmpcfg_ent ty_xlenbits).
@@ -729,6 +743,7 @@ Module Export RiscvPmpBase <: Base.
   Definition record_denote (R : Records) : Set :=
     match R with
     | rpmpcfg_ent => Pmpcfg_ent
+    | rmseccfg    => Mseccfg
     | rmstatus    => Mstatus
     | rminterrupts    => Minterrupts
     end.
@@ -932,6 +947,10 @@ Module Export RiscvPmpBase <: Base.
                        "W" ∷ ty.bool;
                        "R" ∷ ty.bool
       ]
+    | rmseccfg    => ["MML" :: ty.bool;
+                      "MMWP" :: ty.bool;
+                      "RLB" :: ty.bool
+      ]
     | rmstatus    => ["MPP" ∷ ty_privilege
                       ; "MPIE" ∷ ty.bool
                       ; "MIE" ∷ ty.bool
@@ -947,6 +966,7 @@ Module Export RiscvPmpBase <: Base.
 
   Equations record_fold (R : recordi) : NamedEnv Val (record_field_type R) -> recordt R :=
   | rpmpcfg_ent  | [l;a;x;w;r]%env := MkPmpcfg_ent l a x w r
+  | rmseccfg     | [mml;mmwp;rlb]%env       := MkMseccfg mml mmwp rlb
   | rmstatus     | [mpp;mpie;mie]%env       := MkMstatus mpp mpie mie
   | rminterrupts | [mei;uei;mti;uti;msi;usi]%env       := MkMinterrupts mei uei mti uti msi usi.
 
@@ -956,6 +976,9 @@ Module Export RiscvPmpBase <: Base.
                          (_ ∷ ty.bool             ; X p);
                          (_ ∷ ty.bool             ; W p);
                          (_ ∷ ty.bool             ; R p) ]
+  | rmseccfg     | m := [kv ("MML" ∷ ty.bool; MML m)
+                         ; ("MMWP" ∷ ty.bool; MMWP m)
+                         ; ("RLB" ∷ ty.bool; RLB m)]
   | rmstatus     | m := [kv ("MPP" ∷ ty_privilege; MPP m)
                          ; ("MPIE" ∷ ty.bool; MPIE m)
                          ; ("MIE" ∷ ty.bool; MIE m)]
@@ -999,6 +1022,7 @@ Module Export RiscvPmpBase <: Base.
     Inductive Reg : Ty -> Set :=
     | pc            : Reg ty_xlenbits
     | nextpc        : Reg ty_xlenbits
+    | mseccfg       : Reg ty_mseccfg
     | mstatus       : Reg ty_mstatus
     | mie           : Reg ty_Minterrupts
     | mip           : Reg ty_Minterrupts
@@ -1095,6 +1119,7 @@ Module Export RiscvPmpBase <: Base.
         match x , y with
         | pc            , pc            => left eq_refl
         | nextpc        , nextpc        => left eq_refl
+        | mseccfg       , mseccfg       => left eq_refl
         | mstatus       , mstatus       => left eq_refl
         | mie           , mie       => left eq_refl
         | mip           , mip       => left eq_refl
@@ -1149,6 +1174,7 @@ Module Export RiscvPmpBase <: Base.
       {| enum :=
         [ existT _ pc;
           existT _ nextpc;
+          existT _ mseccfg;
           existT _ mstatus;
           existT _ mie;
           existT _ mip;

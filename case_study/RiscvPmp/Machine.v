@@ -415,6 +415,23 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
                    (exp_val (ty.bvec (xlenbits - 13)) [bv 0x0])))
     end.
 
+  Definition stm_mseccfg_from_bits {Γ} (b : Stm Γ ty_xlenbits) : Stm Γ ty_mseccfg :=
+    let: "b" := b in
+    let: "mml" := exp_binop bop.bvand (exp_var "b") (exp_val ty_xlenbits (Bitvector.bv.of_N 1)) != exp_val ty_xlenbits (Bitvector.bv.of_N 0) in
+    let: "mmwp" := exp_binop bop.bvand (exp_var "b") (exp_val ty_xlenbits (Bitvector.bv.of_N 2)) != exp_val ty_xlenbits (Bitvector.bv.of_N 0) in
+    let: "rlb" := exp_binop bop.bvand (exp_var "b") (exp_val ty_xlenbits (Bitvector.bv.of_N 4)) != exp_val ty_xlenbits (Bitvector.bv.of_N 0) in
+    stm_exp (exp_record rmseccfg [ exp_var "mml"; exp_var "mmwp"; exp_var "rlb" ]).
+
+  Definition stm_mseccfg_to_bits {Γ} (msec : Stm Γ ty_mseccfg) : Stm Γ ty_xlenbits :=
+    let: "msec" := msec in
+    match: exp_var "msec" in rmseccfg with
+      ["mml"; "mmwp"; "rlb"] =>
+        let: "mmlb" := if: exp_var "mml" then stm_val (ty.bvec 1) [bv 0x1] else stm_val (ty.bvec 1) [bv 0x0] in
+        let: "mmwpb" := if: exp_var "mmwp" then stm_val (ty.bvec 1) [bv 0x1] else stm_val (ty.bvec 1) [bv 0x0] in
+        let: "rlbb" := if: exp_var "rlb" then stm_val (ty.bvec 1) [bv 0x1] else stm_val (ty.bvec 1) [bv 0x0] in
+        exp_zext (exp_bvapp (exp_bvapp (exp_var "rlbb") (exp_var "mmwpb")) (exp_var "mmlb"))
+    end.
+
   Definition fun_Minterrupts_to_bits : Stm ["i" ∷ ty_Minterrupts] ty_xlenbits :=
     match: exp_var "i" in rminterrupts with
       ["MEI"; "UEI"; "MTI"; "UTI"; "MSI"; "USI"] =>
@@ -1043,6 +1060,10 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
 
   Definition fun_is_CSR_defined : Stm [csr ∷ ty_csridx; p ∷ ty_privilege] ty.bool :=
     match: csr in csridx with
+    | MSeccfg => match: p in privilege with
+                 | Machine => stm_val ty.bool true
+                 | _ => stm_val ty.bool false
+                 end
     | MStatus => match: p in privilege with
                  | Machine => stm_val ty.bool true
                  | _ => stm_val ty.bool false
@@ -1107,6 +1128,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
 
   Definition fun_readCSR : Stm [csr ∷ ty_csridx] ty_xlenbits :=
     match: csr in csridx with
+    | MSeccfg   => stm_mseccfg_to_bits (stm_read_register mseccfg)
     | MStatus   => stm_mstatus_to_bits (stm_read_register mstatus)
     | Mie       => let: value := stm_read_register mie in
                    call Minterrupts_to_bits value
@@ -1126,6 +1148,9 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
 
   Definition fun_writeCSR : Stm [csr ∷ ty_csridx; value ∷ ty_xlenbits] ty.unit :=
     match: csr in csridx with
+    | MSeccfg => let: tmp := stm_mseccfg_from_bits value in
+                 stm_write_register mseccfg tmp ;;
+                 stm_val ty.unit tt
     | MStatus => let: tmp := stm_mstatus_from_bits value in
                  stm_write_register mstatus tmp ;;
                  stm_val ty.unit tt
