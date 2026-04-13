@@ -114,6 +114,7 @@ Section Loop.
      (∃ ms : Xlenbits,  mscratch      ↦ ms)              ∗
      (∃ v : Xlenbits,   mepc          ↦ v)               ∗
      (∃ mpie mie,       mstatus       ↦ {| MPP := mpp; MPIE := mpie; MIE := mie |}) ∗
+     (∃ mml mmwp rlb,   mseccfg       ↦ {| MML := mml; MMWP := mmwp; RLB := rlb |}) ∗
                         interp_pmp_entries entries       ∗
                         interp_pmp_addr_access (mG := sailGS_memGS) liveAddrs mmioAddrs entries m ∗
                         interp_gprs)%I.
@@ -131,6 +132,7 @@ Section Loop.
            pc ↦ v) ∗
      mtvec ↦ h ∗
      (∃ mpie mie, mstatus ↦ {| MPP := mpp; MPIE := mpie; MIE := mie |}) ∗
+     (∃ mml mmwp rlb,   mseccfg       ↦ {| MML := mml; MMWP := mmwp; RLB := rlb |}) ∗
      (∃ v, mepc ↦ v))%I.
 
   Definition CSRMod (m : Privilege) (entries : list (Pmpcfg_ent * Xlenbits)) :=
@@ -147,6 +149,7 @@ Section Loop.
            pc ↦ v) ∗
      (∃ h, mtvec ↦ h) ∗
      (∃ mpp mpie mie, mstatus ↦ {| MPP := mpp; MPIE := mpie; MIE := mie |}) ∗
+     (∃ mml mmwp rlb,   mseccfg       ↦ {| MML := mml; MMWP := mmwp; RLB := rlb |}) ∗
      (∃ mepc_v, mepc ↦ mepc_v))%I.
 
   Definition Trap (m : Privilege) (h : Xlenbits) (entries : list (Pmpcfg_ent * Xlenbits)) :=
@@ -162,6 +165,7 @@ Section Loop.
      pc ↦ h ∗
      mtvec ↦ h ∗
      (∃ mpie , mstatus ↦ {| MPP := m; MPIE := mpie; MIE := false |}) ∗
+     (∃ mml mmwp rlb,   mseccfg       ↦ {| MML := mml; MMWP := mmwp; RLB := rlb |}) ∗
      (∃ mepc_v, mepc ↦ mepc_v))%I.
 
   Definition Recover (m : Privilege) (h : Xlenbits) (mpp : Privilege) (entries : list (Pmpcfg_ent * Xlenbits)) :=
@@ -178,6 +182,7 @@ Section Loop.
                 pc     ↦ mepc_v ∗
                 nextpc ↦ mepc_v) ∗
      mtvec ↦ h ∗
+     (∃ mml mmwp rlb,   mseccfg       ↦ {| MML := mml; MMWP := mmwp; RLB := rlb |}) ∗
      (∃ mpie mie, mstatus ↦ {| MPP := User; MPIE := mpie; MIE := mie |}))%I.
 
   (* Executing normally *)
@@ -296,7 +301,7 @@ Section Loop.
   Lemma valid_step_semTriple :
     ⊢ semTriple_step.
   Proof.
-    iIntros (m i h mepc_v mpp entries) "(Hcp & Hmtvec & Hpc & Hnpc & Hmc & Hmip & Hmie & Hmscr & Hmepc & Hmstatus & Hpe & Hpaa & Hgprs)".
+    iIntros (m i h mepc_v mpp entries) "(Hcp & Hmtvec & Hpc & Hnpc & Hmc & Hmip & Hmie & Hmscr & Hmepc & Hmstatus & Hmseccfg & Hpe & Hpaa & Hgprs)".
     iApply (semWP_mono with "[-]").
     iApply valid_step_contract.
     Unshelve.
@@ -307,13 +312,13 @@ Section Loop.
     unfold step_post.
     iIntros ([v|e] _); last auto;
       iIntros "[H | [H | [H | H]]]".
-    - iDestruct "H" as "(Hpaa & Hgprs & Hpe & Hmc & Hmie & Hmip & Hmscr & Hcp & Hnpc & Hmtvec & Hmstatus & Hmepc)".
+    - iDestruct "H" as "(Hpaa & Hgprs & Hpe & Hmc & Hmie & Hmip & Hmscr & Hcp & Hnpc & Hmtvec & Hmstatus & Hmseccfg & Hmepc)".
       iLeft; unfold Execution; iFrame.
-    - iDestruct "H" as "(Hpaa & Hgprs & Hpe & [% _] & Hmc & Hmie & Hmip & Hcp & Hnpc & Hmtvec & Hmstatus & Hmepc)".
+    - iDestruct "H" as "(Hpaa & Hgprs & Hpe & [% _] & Hmc & Hmie & Hmip & Hcp & Hnpc & Hmtvec & Hmstatus & Hmseccfg & Hmepc)".
       iRight; iLeft; unfold CSRMod; now iFrame.
-    - iDestruct "H" as "(Hpaa & Hgprs & Hentries & Hmc & Hmie & Hmip & Hmscratch & Hpe & Hcp & Hnpc & Hmtvec & Hmstatus & Hmepc)".
+    - iDestruct "H" as "(Hpaa & Hgprs & Hentries & Hmc & Hmie & Hmip & Hmscratch & Hpe & Hcp & Hnpc & Hmtvec & Hmstatus & Hmseccfg & Hmepc)".
       iRight; iRight; iLeft; unfold Trap; iFrame.
-    - iDestruct "H" as "(Hpaa & Hgprs & Hpe & [% _] & Hmc & Hmie & Hmip & Hmscratch & Hcp & [% (Hmepc & Hnpc & Hpc)] & Hmtvec & Hmstatus)".
+    - iDestruct "H" as "(Hpaa & Hgprs & Hpe & [% _] & Hmc & Hmie & Hmip & Hmscratch & Hcp & [% (Hmepc & Hnpc & Hpc)] & Hmtvec & Hmseccfg & Hmstatus)".
       iRight; iRight; iRight; unfold Recover; by iFrame.
   Qed.
 
@@ -361,7 +366,7 @@ Section Loop.
     iIntros ([v|e] δ); last (iIntros "_"; by rewrite semWP_fail);
       iIntros "[HRes | [HRes | [HRes | HRes]]]";
       iApply (semWP_call_inline loop _).
-    - iDestruct "HRes" as "(? & ? & ? & ? & ? & ? & ? & ? & [%i' (? & ?)] & ? & ? & ?)".
+    - iDestruct "HRes" as "(? & ? & ? & ? & ? & ? & ? & ? & [%i' (? & ?)] & ? & ? & ? )".
       unfold semTriple_loop.
       iApply ("H" $! m h i' mpp entries).
       unfold loop_pre.
