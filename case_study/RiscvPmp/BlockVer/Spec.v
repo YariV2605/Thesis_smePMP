@@ -692,7 +692,7 @@ Module RiscvPmpSpecVerif.
 
   Lemma valid_pmpCheck {bytes : nat} {H : restrict_bytes bytes} : ValidContractWithFuelDebug 4 (@pmpCheck bytes H).
   Proof.
-    destruct H; apply verification_condition_with_erasure_sound; vm_compute;
+    destruct H. apply verification_condition_with_erasure_sound; vm_compute.
       constructor; cbn;
       repeat (intros; split; intros);
       repeat match goal with

@@ -614,6 +614,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
                   (* Modified CSRs, requires Machine mode *)
                                  asn_pmp_addr_access (term_var "entries") (term_var "m") ∗
                                  asn_gprs ∗
+                  ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [ term_var "mml"; term_var "mmwp"; term_var "rlb" ] ∗
                   ∃ "entries",   asn_pmp_entries (term_var "entries") ∗
                                  term_var "m"  =  term_val ty_privilege Machine ∗
                   ∃ "mcause", mcause ↦ term_var "mcause" ∗
@@ -630,6 +631,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
                   (* Trap occured -> Go into M-mode *)
                   asn_pmp_addr_access (term_var "entries") (term_var "m") ∗
                   asn_gprs ∗
+                  ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [ term_var "mml"; term_var "mmwp"; term_var "rlb" ] ∗
                   asn_pmp_entries (term_var "entries") ∗
                   ∃ "mcause", mcause ↦ term_var "mcause" ∗
                   ∃ "mie",    mie           ↦ term_var "mie" ∗
@@ -645,6 +647,7 @@ Module Import RiscvPmpSpecification <: Specification RiscvPmpBase RiscvPmpSignat
                   (* MRET = Recover *)
                   asn_pmp_addr_access (term_var "entries") (term_var "m") ∗
                   asn_gprs ∗
+                  ∃ "mml", ∃ "mmwp", ∃ "rlb", mseccfg ↦ term_record rmseccfg [ term_var "mml"; term_var "mmwp"; term_var "rlb" ] ∗
                   asn_pmp_entries (term_var "entries") ∗
                   term_var "m"  =  term_val ty_privilege Machine ∗
                   ∃ "mcause", mcause ↦ term_var "mcause" ∗

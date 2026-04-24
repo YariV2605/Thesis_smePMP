@@ -314,11 +314,11 @@ Section Loop.
       iIntros "[H | [H | [H | H]]]".
     - iDestruct "H" as "(Hpaa & Hgprs & Hpe & Hmc & Hmie & Hmip & Hmscr & Hcp & Hnpc & Hmtvec & Hmstatus & Hmseccfg & Hmepc)".
       iLeft; unfold Execution; iFrame.
-    - iDestruct "H" as "(Hpaa & Hgprs & Hpe & [% _] & Hmc & Hmie & Hmip & Hcp & Hnpc & Hmtvec & Hmstatus & Hmseccfg & Hmepc)".
+    - iDestruct "H" as "(Hpaa & Hgprs & Hmseccfg & Hpe & [% _] & Hmc & Hmie & Hmip & Hmscratch & Hcp & Hnpc & Hmtvec & Hmstatus & Hmepc)".
       iRight; iLeft; unfold CSRMod; now iFrame.
     - iDestruct "H" as "(Hpaa & Hgprs & Hentries & Hmc & Hmie & Hmip & Hmscratch & Hpe & Hcp & Hnpc & Hmtvec & Hmstatus & Hmseccfg & Hmepc)".
       iRight; iRight; iLeft; unfold Trap; iFrame.
-    - iDestruct "H" as "(Hpaa & Hgprs & Hpe & [% _] & Hmc & Hmie & Hmip & Hmscratch & Hcp & [% (Hmepc & Hnpc & Hpc)] & Hmtvec & Hmseccfg & Hmstatus)".
+    - iDestruct "H" as "(Hpaa & Hgprs & Hmseccfg & Hpe & [% _] & Hmc & Hmie & Hmip & Hmscratch & Hcp & [% (Hmepc & Hnpc & Hpc)] & Hmtvec & Hmstatus)".
       iRight; iRight; iRight; unfold Recover; by iFrame.
   Qed.
 
@@ -366,7 +366,7 @@ Section Loop.
     iIntros ([v|e] δ); last (iIntros "_"; by rewrite semWP_fail);
       iIntros "[HRes | [HRes | [HRes | HRes]]]";
       iApply (semWP_call_inline loop _).
-    - iDestruct "HRes" as "(? & ? & ? & ? & ? & ? & ? & ? & [%i' (? & ?)] & ? & ? & ? )".
+    - iDestruct "HRes" as "(? & ? & ? & ? & ? & ? & ? & ? & [%i' (? & ?)] & ? & ? & ? & ?)". (* need extra '& ?'*)
       unfold semTriple_loop.
       iApply ("H" $! m h i' mpp entries).
       unfold loop_pre.
