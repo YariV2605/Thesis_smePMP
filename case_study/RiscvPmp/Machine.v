@@ -105,6 +105,7 @@ Module RiscvNotations.
   Notation "'tmp1'"         := "tmp1" : string_scope.
   Notation "'tmp2'"         := "tmp2" : string_scope.
   Notation "'tmp3'"         := "tmp3" : string_scope.
+  (* Notation "'mseccfg_val'"  := "mseccfg_val" : string_scope. *)
   Notation "'rs1_int'"      := "rs1_int" : string_scope.
   Notation "'rs2_int'"      := "rs2_int" : string_scope.
   Notation "'result_wide'"  := "result_wide" : string_scope.
@@ -698,9 +699,23 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
     | inr v => stm_call (@checked_mem_write bytes H) [paddr; data]
     end.
 
-  (*FIXME*)
+  (* cfg.L & !mseccfg.RLB *)
   Definition fun_pmpLocked : Stm [cfg ∷ ty_pmpcfg_ent] ty.bool :=
-    match: cfg in rpmpcfg_ent with [L; A; X; W; R] => L end.
+    match: cfg in rpmpcfg_ent with
+      [L; A; X; W; R] =>
+      if: L then
+        (* QUESTION how to correctly access mseccfg? *)
+        let: "mseccfg_val" := stm_read_register mseccfg in
+        match: exp_var "mseccfg_val" in rmseccfg with
+          ["MML"; "MMWP"; "RLB"] =>
+          if exp_var "RLB" then
+            stm_val ty.bool false
+          else
+            stm_val ty.bool true
+        end
+      else
+        stm_val ty.bool false
+    end.
 
   Definition fun_pmpWriteCfgReg : Stm ["n" :: ty.int; value :: ty_xlenbits] ty.unit :=
     if: exp_var "n" = exp_int 0%Z
@@ -716,7 +731,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
       stm_val ty.unit tt
     else fail "writing to non-existent cfg".
 
-  (*FIXME*)
+  (*FIXME check that stm_pmpcfg_ent_from_bits checks the WARL (and update it to include new possiblities) *)
   Definition fun_pmpWriteCfg : Stm [cfg :: ty_pmpcfg_ent; value :: ty_byte] ty_pmpcfg_ent :=
     let: locked := call pmpLocked cfg in
     if: locked then cfg else stm_pmpcfg_ent_from_bits value.
@@ -744,11 +759,24 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
       | PMP_Success  => stm_val ty.bool true
       | PMP_Fail     => stm_val ty.bool false
       | PMP_Continue =>
-      (*FIXME update from sail line 115 to 146-151*)
-          match: priv in privilege with
+          (* QUESTION how to correctly access mseccfg? *)
+          let: "mseccfg_val" := stm_read_register mseccfg in
+          match: exp_var "mseccfg_val" in rmseccfg with
+            ["MML"; "MMWP"; "RLB"] =>
+            match: priv in privilege with
+            | Machine =>
+              if: !exp_var "MMWP" && ( !exp_var "MML" || acc != KExecute )
+              then
+                stm_val ty.bool false
+              else
+                stm_val ty.bool true
+            | User => stm_val ty.bool true
+            end
+          end
+          (* match: priv in privilege with
           | Machine => stm_val ty.bool true
           | User    => stm_val ty.bool false
-          end
+          end *)
       end
       end in
       use lemma close_pmp_entries ;;
@@ -762,21 +790,42 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
         |> KExecute pat_unit   => stm_exp (Some E_Fetch_Access_Fault)
         end.
 
-  (*FIXME pmpCheckPerms in sail code (only exists in new version)*)
   Definition fun_smePmpCheckPerms : Stm [ent ∷ ty_pmpcfg_ent; acc ∷ ty_access_type; priv ∷ ty_privilege] ty.bool :=
-  match: priv in privilege with
-  | _ => stm_val ty.bool false
-  end.
-  (* if: sme_enabled
-  then
-    if mseccfg[MML]
-    then
-      match acc with
-      | 
+  let: "mseccfg_val" := stm_read_register mseccfg in
+  match: exp_var "mseccfg_val" in rmseccfg with
+    ["MML"; "MMWP"; "RLB"] =>
+    if: exp_var "MML" then
+      match: ent in rpmpcfg_ent with
+        [L; A; X; W; R] =>
+        match:
+          let: tmp1 := call pmpLocked ent in
+          (* QUESTION no bin operations in if statements?
+              Do we need else statements?
+          *)
+          if: tmp1 & !R & W then
+            match: acc in union access_type with
+            |> KExecute pat_unit => stm_val ty.bool true
+            |> KRead pat_unit => priv = Machine | X
+            |> _ => stm_val ty.bool false
+            end
+          if: !tmp1 & !R & W then
+            match acc in union access_type with
+            |> KRead pat_unit => stm_val ty.bool true
+            |> KWrite pat_unit => priv = Machine | X
+            |> _ => stm_val ty.bool false
+            end
+          if: tmp1 & R & W & X then
+            match acc in union access_type with
+            |> KRead pat_unit => stm_val ty.bool true
+            |> _ => stm_val ty.bool false
+          else
+            match: priv in privilage with
+            | Machine => tmp1 & pmpCheckRWX(ent, acc)
+            | _ => !tmp1 & pmpCheckRWX(ent, acc)
+        end
       end
-    else
-  else
-    stm_val ty.bool false *)
+    else stm_val ty.bool false
+  end.
 
   Definition fun_pmpCheckPerms : Stm [ent ∷ ty_pmpcfg_ent; acc ∷ ty_access_type; priv ∷ ty_privilege] ty.bool :=
     let: tmp1 := call smePmpCheckPerms ent acc priv in
@@ -813,6 +862,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
     | PMP_NoMatch      => exp_val ty_pmpmatch PMP_Continue
     | PMP_PartialMatch => exp_val ty_pmpmatch PMP_Fail
     | PMP_Match        =>
+      (* this is the equivalent of pmpCheckPerms | pmpCheckRWX | (priv = Machine & not (locked)) in the risc-v sail code *)
       let: tmp := call pmpCheckPerms ent acc priv in
       if: tmp
       then exp_val ty_pmpmatch PMP_Success
