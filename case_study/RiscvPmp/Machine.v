@@ -465,6 +465,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
     let em := exp_val (ty.bvec n) (Bitvector.bv.of_N (N.shiftl 1 i)) in
     exp_binop bop.bvand eb em = em.
 
+  (* FIXME need to check the WARL for the smePMP case if MML is set*)
   Definition stm_pmpcfg_ent_from_bits {Γ} (b : Stm Γ ty_byte) : Stm Γ ty_pmpcfg_ent :=
     let: "b" := b in
     let: "L" := exp_testbit (exp_var "b") 7 in
@@ -708,7 +709,7 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
         let: "mseccfg_val" := stm_read_register mseccfg in
         match: exp_var "mseccfg_val" in rmseccfg with
           ["MML"; "MMWP"; "RLB"] =>
-          if exp_var "RLB" then
+          if: exp_var "RLB" then
             stm_val ty.bool false
           else
             stm_val ty.bool true
@@ -759,13 +760,12 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
       | PMP_Success  => stm_val ty.bool true
       | PMP_Fail     => stm_val ty.bool false
       | PMP_Continue =>
-          (* QUESTION how to correctly access mseccfg? *)
           let: "mseccfg_val" := stm_read_register mseccfg in
           match: exp_var "mseccfg_val" in rmseccfg with
             ["MML"; "MMWP"; "RLB"] =>
             match: priv in privilege with
             | Machine =>
-              if: !exp_var "MMWP" && ( !exp_var "MML" || acc != KExecute )
+              if: exp_not(exp_var "MMWP") && ( exp_not(exp_var "MML") || (acc != Execute ))
               then
                 stm_val ty.bool false
               else
@@ -796,33 +796,37 @@ Module Import RiscvPmpProgram <: Program RiscvPmpBase.
     ["MML"; "MMWP"; "RLB"] =>
     if: exp_var "MML" then
       match: ent in rpmpcfg_ent with
-        [L; A; X; W; R] =>
-        match:
+        ["L"; "A"; "X"; "W"; "R"] =>
           let: tmp1 := call pmpLocked ent in
-          (* QUESTION no bin operations in if statements?
-              Do we need else statements?
-          *)
-          if: tmp1 & !R & W then
+          if: tmp1 && exp_not(R) && W then
             match: acc in union access_type with
             |> KExecute pat_unit => stm_val ty.bool true
-            |> KRead pat_unit => priv = Machine | X
-            |> _ => stm_val ty.bool false
+            |> KRead pat_unit => stm_exp ((priv = exp_val ty_privilege Machine) || X)
+            |> KWrite pat_unit => stm_val ty.bool false
+            |> KReadWrite pat_unit => stm_val ty.bool false
             end
-          if: !tmp1 & !R & W then
-            match acc in union access_type with
-            |> KRead pat_unit => stm_val ty.bool true
-            |> KWrite pat_unit => priv = Machine | X
-            |> _ => stm_val ty.bool false
-            end
-          if: tmp1 & R & W & X then
-            match acc in union access_type with
-            |> KRead pat_unit => stm_val ty.bool true
-            |> _ => stm_val ty.bool false
           else
-            match: priv in privilage with
-            | Machine => tmp1 & pmpCheckRWX(ent, acc)
-            | _ => !tmp1 & pmpCheckRWX(ent, acc)
-        end
+          if: exp_not(tmp1) && exp_not(R) && W then
+            match: acc in union access_type with
+            |> KRead pat_unit => stm_val ty.bool true
+            |> KWrite pat_unit => stm_exp ((priv = exp_val ty_privilege Machine) || X)
+            |> KExecute pat_unit => stm_val ty.bool false
+            |> KReadWrite pat_unit => stm_val ty.bool false
+            end
+          else
+          if: tmp1 && R && W && X then
+            match: acc in union access_type with
+            |> KRead pat_unit => stm_val ty.bool true
+            |> KExecute pat_unit => stm_val ty.bool false
+            |> KReadWrite pat_unit => stm_val ty.bool false
+            |> KWrite pat_unit => stm_val ty.bool false
+            end
+          else
+            let: tmp2 := call pmpCheckRWX ent acc in
+            match: priv in privilege with
+            | Machine => tmp1 && tmp2
+            | _ => stm_exp (exp_not(tmp1) && tmp2)
+            end
       end
     else stm_val ty.bool false
   end.
